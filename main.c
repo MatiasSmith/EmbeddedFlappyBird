@@ -87,6 +87,9 @@
 #include "common.h"
 #include "simplelink.h"
 
+//I2C
+#include "i2c_if.h"
+
 //#define CONSOLE1               UARTA1_BASE
 //#define CONSOLE_PERIPH1        PRCM_UARTA1
 
@@ -903,10 +906,504 @@ void getStringLength(int number) {
 
 //************************For Webservice Communication**************************
 
+//***************************************I2C************************************
 
 
+#define SPI_IF_BIT_RATE  100000
+#define TR_BUFF_SIZE     100
 
 
+//*****************************************************************************
+//                      MACRO DEFINITIONS
+//*****************************************************************************
+//#define APPLICATION_VERSION     "1.4.0"
+#define APP_NAME                "I2C Demo"
+#define UART_PRINT              Report
+#define FOREVER                 1
+#define CONSOLE                 UARTA0_BASE
+#define FAILURE                 -1
+#define SUCCESS                 0
+#define RETERR_IF_TRUE(condition) {if(condition) return FAILURE;}
+#define RET_IF_ERR(Func)          {int iRetVal = (Func); \
+                                   if (SUCCESS != iRetVal) \
+                                     return  iRetVal;}
+
+//*****************************************************************************
+//                 GLOBAL VARIABLES -- Start
+//*****************************************************************************
+#if defined(ccs)
+extern void (* const g_pfnVectors[])(void);
+#endif
+#if defined(ewarm)
+extern uVectorEntry __vector_table;
+#endif
+//*****************************************************************************
+//                 GLOBAL VARIABLES -- End
+//*****************************************************************************
+
+
+//****************************************************************************
+//                      LOCAL FUNCTION DEFINITIONS
+//****************************************************************************
+
+//*****************************************************************************
+//
+//! Display a prompt for the user to enter command
+//!
+//! \param  none
+//!
+//! \return none
+//!
+//*****************************************************************************
+void
+DisplayPrompt()
+{
+    UART_PRINT("\n\rcmd#");
+}
+
+/*void delay(unsigned long ulCount){
+    int i;
+
+  do{
+    ulCount--;
+        for (i=0; i< 65535; i++) ;
+    }while(ulCount);
+}*/
+
+//*****************************************************************************
+//
+//! Display the usage of the I2C commands supported
+//!
+//! \param  none
+//!
+//! \return none
+//!
+//*****************************************************************************
+void
+DisplayUsage()
+{
+    UART_PRINT("Command Usage \n\r");
+    UART_PRINT("------------- \n\r");
+    UART_PRINT("write <dev_addr> <wrlen> <<byte0> [<byte1> ... ]> <stop>\n\r");
+    UART_PRINT("\t - Write data to the specified i2c device\n\r");
+    UART_PRINT("read  <dev_addr> <rdlen> \n\r\t - Read data frpm the specified "
+                "i2c device\n\r");
+    UART_PRINT("writereg <dev_addr> <reg_offset> <wrlen> <<byte0> [<byte1> ... "
+                "]> \n\r");
+    UART_PRINT("\t - Write data to the specified register of the i2c device\n\r");
+    UART_PRINT("readreg <dev_addr> <reg_offset> <rdlen> \n\r");
+    UART_PRINT("\t - Read data from the specified register of the i2c device\n\r");
+    UART_PRINT("\n\r");
+    UART_PRINT("Parameters \n\r");
+    UART_PRINT("---------- \n\r");
+    UART_PRINT("dev_addr - slave address of the i2c device, a hex value "
+                "preceeded by '0x'\n\r");
+    UART_PRINT("reg_offset - register address in the i2c device, a hex value "
+                "preceeded by '0x'\n\r");
+    UART_PRINT("wrlen - number of bytes to be written, a decimal value \n\r");
+    UART_PRINT("rdlen - number of bytes to be read, a decimal value \n\r");
+    UART_PRINT("bytex - value of the data to be written, a hex value preceeded "
+                "by '0x'\n\r");
+    UART_PRINT("stop - number of stop bits, 0 or 1\n\r");
+    UART_PRINT("--------------------------------------------------------------"
+                "--------------- \n\r\n\r");
+
+}
+
+//*****************************************************************************
+//
+//! Display the buffer contents over I2C
+//!
+//! \param  pucDataBuf is the pointer to the data store to be displayed
+//! \param  ucLen is the length of the data to be displayed
+//!
+//! \return none
+//!
+//*****************************************************************************
+void
+DisplayBuffer(unsigned char *pucDataBuf, unsigned char ucLen)
+{
+    unsigned char ucBufIndx = 0;
+    UART_PRINT("Read contents");
+    UART_PRINT("\n\r");
+    while(ucBufIndx < ucLen)
+    {
+        UART_PRINT(" 0x%x, ", pucDataBuf[ucBufIndx]);
+        ucBufIndx++;
+        if((ucBufIndx % 8) == 0)
+        {
+            UART_PRINT("\n\r");
+        }
+    }
+    UART_PRINT("\n\r");
+}
+
+/*void
+DisplayBuffer2(int pucDataBuf, unsigned char ucLen)
+{
+    unsigned char ucBufIndx = 0;
+    UART_PRINT("Read contents");
+    UART_PRINT("\n\r");
+//    while(ucBufIndx < ucLen)
+//   {
+        UART_PRINT(" 0x%x, ", pucDataBuf);
+//        ucBufIndx++;
+//        if((ucBufIndx % 8) == 0)
+//        {
+//            UART_PRINT("\n\r");
+//        }
+//    }
+    UART_PRINT("\n\r");
+}*/
+
+//*****************************************************************************
+//
+//! Application startup display on UART
+//!
+//! \param  none
+//!
+//! \return none
+//!
+//*****************************************************************************
+static void
+DisplayBanner(char * AppName)
+{
+
+    Report("\n\n\n\r");
+    Report("\t\t *************************************************\n\r");
+    Report("\t\t      CC3200 %s Application       \n\r", AppName);
+    Report("\t\t *************************************************\n\r");
+    Report("\n\n\n\r");
+}
+
+//****************************************************************************
+//
+//! Parses the read command parameters and invokes the I2C APIs
+//!
+//! \param pcInpString pointer to the user command parameters
+//!
+//! This function
+//!    1. Parses the read command parameters.
+//!    2. Invokes the corresponding I2C APIs
+//!
+//! \return 0: Success, < 0: Failure.
+//
+//****************************************************************************
+int
+ProcessReadCommand(char *pcInpString)
+{
+    unsigned char ucDevAddr, ucLen;
+    unsigned char aucDataBuf[256];
+    char *pcErrPtr;
+    int iRetVal;
+
+    //
+    // Get the device address
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucDevAddr = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+    //
+    // Get the length of data to be read
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucLen = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
+    //RETERR_IF_TRUE(ucLen > sizeof(aucDataBuf));
+
+    //
+    // Read the specified length of data
+    //
+    iRetVal = I2C_IF_Read(ucDevAddr, aucDataBuf, ucLen);
+
+    if(iRetVal == SUCCESS)
+    {
+        UART_PRINT("I2C Read complete\n\r");
+
+        //
+        // Display the buffer over UART on successful write
+        //
+        DisplayBuffer(aucDataBuf, ucLen);
+    }
+    else
+    {
+        UART_PRINT("I2C Read failed\n\r");
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
+//****************************************************************************
+//
+//! Parses the readreg command parameters and invokes the I2C APIs
+//! i2c readreg 0x<dev_addr> 0x<reg_offset> <rdlen>
+//!
+//! \param pcInpString pointer to the readreg command parameters
+//!
+//! This function
+//!    1. Parses the readreg command parameters.
+//!    2. Invokes the corresponding I2C APIs
+//!
+//! \return 0: Success, < 0: Failure.
+//
+//****************************************************************************
+int
+ProcessReadRegCommand(char *pcInpString)
+{
+    unsigned char ucDevAddr, ucRegOffset, ucRdLen;
+    unsigned char aucRdDataBuf[256];
+    char *pcErrPtr;
+
+    //
+    // Get the device address
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucDevAddr = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+    //
+    // Get the register offset address
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucRegOffset = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+
+    //
+    // Get the length of data to be read
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucRdLen = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
+    //RETERR_IF_TRUE(ucLen > sizeof(aucDataBuf));
+
+    //
+    // Write the register address to be read from.
+    // Stop bit implicitly assumed to be 0.
+    //                    bma ad      reg offset
+
+    while (1) {
+    RET_IF_ERR(I2C_IF_Write(ucDevAddr,&ucRegOffset,1,0));
+
+    //
+    // Read the specified length of data
+    //
+    RET_IF_ERR(I2C_IF_Read(ucDevAddr, &aucRdDataBuf[0], ucRdLen));
+
+    UART_PRINT("I2C Read From address complete\n\r");
+
+    //
+    // Display the buffer over UART on successful readreg
+    //
+    DisplayBuffer(aucRdDataBuf, ucRdLen);
+    delay(50);
+    }
+
+    return SUCCESS;
+}
+
+//****************************************************************************
+//
+//! Parses the writereg command parameters and invokes the I2C APIs
+//! i2c writereg 0x<dev_addr> 0x<reg_offset> <wrlen> <0x<byte0> [0x<byte1> ...]>
+//!
+//! \param pcInpString pointer to the readreg command parameters
+//!
+//! This function
+//!    1. Parses the writereg command parameters.
+//!    2. Invokes the corresponding I2C APIs
+//!
+//! \return 0: Success, < 0: Failure.
+//
+//****************************************************************************
+int
+ProcessWriteRegCommand(char *pcInpString)
+{
+    unsigned char ucDevAddr, ucRegOffset, ucWrLen;
+    unsigned char aucDataBuf[256];
+    char *pcErrPtr;
+    int iLoopCnt = 0;
+
+    //
+    // Get the device address
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucDevAddr = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+
+    //
+    // Get the register offset to be written
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucRegOffset = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+    aucDataBuf[iLoopCnt] = ucRegOffset;
+    iLoopCnt++;
+
+    //
+    // Get the length of data to be written
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucWrLen = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
+    //RETERR_IF_TRUE(ucWrLen > sizeof(aucDataBuf));
+
+    //
+    // Get the bytes to be written
+    //
+    for(; iLoopCnt < ucWrLen + 1; iLoopCnt++)
+    {
+        //
+        // Store the data to be written
+        //
+        pcInpString = strtok(NULL, " ");
+        RETERR_IF_TRUE(pcInpString == NULL);
+        aucDataBuf[iLoopCnt] =
+                (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+    }
+    //
+    // Write the data values.
+    //
+    RET_IF_ERR(I2C_IF_Write(ucDevAddr,&aucDataBuf[0],ucWrLen+1,1));
+
+    UART_PRINT("I2C Write To address complete\n\r");
+
+    return SUCCESS;
+}
+
+//****************************************************************************
+//
+//! Parses the write command parameters and invokes the I2C APIs
+//!
+//! \param pcInpString pointer to the write command parameters
+//!
+//! This function
+//!    1. Parses the write command parameters.
+//!    2. Invokes the corresponding I2C APIs
+//!
+//! \return 0: Success, < 0: Failure.
+//
+//****************************************************************************
+int
+ProcessWriteCommand(char *pcInpString)
+{
+    unsigned char ucDevAddr, ucStopBit, ucLen;
+    unsigned char aucDataBuf[256];
+    char *pcErrPtr;
+    int iRetVal, iLoopCnt;
+
+    //
+    // Get the device address
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucDevAddr = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+
+    //
+    // Get the length of data to be written
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucLen = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
+    //RETERR_IF_TRUE(ucLen > sizeof(aucDataBuf));
+
+    for(iLoopCnt = 0; iLoopCnt < ucLen; iLoopCnt++)
+    {
+        //
+        // Store the data to be written
+        //
+        pcInpString = strtok(NULL, " ");
+        RETERR_IF_TRUE(pcInpString == NULL);
+        aucDataBuf[iLoopCnt] =
+                (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
+    }
+
+    //
+    // Get the stop bit
+    //
+    pcInpString = strtok(NULL, " ");
+    RETERR_IF_TRUE(pcInpString == NULL);
+    ucStopBit = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
+
+    //
+    // Write the data to the specified address
+    //
+    iRetVal = I2C_IF_Write(ucDevAddr, aucDataBuf, ucLen, ucStopBit);
+    if(iRetVal == SUCCESS)
+    {
+        UART_PRINT("I2C Write complete\n\r");
+    }
+    else
+    {
+        UART_PRINT("I2C Write failed\n\r");
+        return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
+//****************************************************************************
+//
+//! Parses the user input command and invokes the I2C APIs
+//!
+//! \param pcCmdBuffer pointer to the user command
+//!
+//! This function
+//!    1. Parses the user command.
+//!    2. Invokes the corresponding I2C APIs
+//!
+//! \return 0: Success, < 0: Failure.
+//
+//****************************************************************************
+int
+ParseNProcessCmd(char *pcCmdBuffer)
+{
+    char *pcInpString;
+    int iRetVal = FAILURE;
+
+    pcInpString = strtok(pcCmdBuffer, " \n\r");
+    if(pcInpString != NULL)
+
+    {
+
+        if(!strcmp(pcInpString, "read"))
+        {
+            //
+            // Invoke the read command handler
+            //
+            iRetVal = ProcessReadCommand(pcInpString);
+        }
+        else if(!strcmp(pcInpString, "readreg"))
+        {
+            //
+            // Invoke the readreg command handler
+            //
+            iRetVal = ProcessReadRegCommand(pcInpString);
+        }
+        else if(!strcmp(pcInpString, "writereg"))
+        {
+            //
+            // Invoke the writereg command handler
+            //
+            iRetVal = ProcessWriteRegCommand(pcInpString);
+        }
+        else if(!strcmp(pcInpString, "write"))
+        {
+            //
+            // Invoke the write command handler
+            //
+            iRetVal = ProcessWriteCommand(pcInpString);
+        }
+        else
+        {
+            UART_PRINT("Unsupported command\n\r");
+            return FAILURE;
+        }
+    }
+
+    return iRetVal;
+}
+
+//***************************************I2C************************************
 
 
 //                              FOR TIMER
@@ -1452,21 +1949,21 @@ int main() {
     }
 
     //Webservice************************************
-    
+
     //I2C*******************************************
     int iRetVal;
     char acCmdStore[512];
-    
+
     //Variables to store the position of the circle on the screen
     int x = 64;
     int y = 64;
     int dy;
     int dx;
-    int size;
-    
+    int size = 1;
+
     // I2C Init
     I2C_IF_Open(I2C_MASTER_MODE_FST);
-    
+
     // To store strings
     char* pcInpString;
 
@@ -1497,10 +1994,10 @@ int main() {
     // Second register offset address
     pcInpString = strtok(test2, " ");
     ucRegOffsety = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
-    
-    
-    
-    
+
+
+
+
     //I2C*******************************************
 
     //UART---------------------------------
@@ -1632,7 +2129,7 @@ int main() {
                     entered = 0;
          }*/
 
-        //For Webservices
+        //For Webservices***********************************************
 
 
         if (GPIOPinRead(GPIOA1_BASE, 0x20)) {
@@ -1651,6 +2148,96 @@ int main() {
                     // Wait for user to release button
                     while(GPIOPinRead(GPIOA1_BASE, 0x20)) {}
         }
+
+        //Webservices*****************************************************
+
+
+        //I2C*************************************************************
+        I2C_IF_Write(ucDevAddr,&ucRegOffsetx,1,0);
+
+            // Read the specified length of data
+            I2C_IF_Read(ucDevAddr, &aucRdDataBufx[0], ucRdLen);
+            //DisplayBuffer(aucRdDataBufx, ucRdLen);
+
+            I2C_IF_Write(ucDevAddr,&ucRegOffsety,1,0);
+
+            I2C_IF_Read(ucDevAddr, &aucRdDataBufy[0], ucRdLen);
+            //DisplayBuffer(aucRdDataBufy, ucRdLen);
+
+            //Convert hex values to integers
+            sprintf(xhex, "%x", aucRdDataBufx[0]);
+            int i = (int)strtol((char*)xhex, NULL, 16);
+            //UART_PRINT("UART i %d, ", i);
+
+
+            sprintf(yhex, "%x", aucRdDataBufy[0]);
+            int j = (int)strtol((char*)yhex, NULL, 16);
+            //UART_PRINT("UART j %d, ", j);
+
+
+            //Only delete previous circle if SW3 not pushed. This allows us to draw
+            if (!GPIOPinRead(GPIOA1_BASE, 0x20)) {
+                fillCircle(x, y, size, BLACK);
+            }
+            //UART_PRINT("Hello");
+
+             //Handle tilting top of screen down
+             if (i > 80) {
+                    dy = (255 - i)/14;
+                    y = y - dy;
+
+                    //If ball goes off screen
+                    if(y < 0) {
+                        fillScreen(BLACK);
+                        y = 127;
+                    }
+
+               }
+              //Handle tilting bottom of screen down
+               else {
+                    dy = i/14;
+                    y = y + dy;
+
+                    //If ball goes off screen
+                    if(y > 127) {
+                        fillScreen(BLACK);
+                        y = 0;
+                    }
+             }
+
+             //Handle tilting left side of screen down
+             if (j > 80) {
+                    dx = (255 - j)/14;
+                    x = x - dx;
+
+                    //If ball goes off screen
+                    if(x < 0) {
+                        fillScreen(BLACK);
+                        x = 127;
+                    }
+               }
+
+              //Handle tilting right side of screen down
+              else {
+                    dx = j/14;
+                    x = x + dx;
+
+                    //If ball goes off screen
+                    if(x > 127) {
+                        fillScreen(BLACK);
+                        x = 0;
+                    }
+              }
+
+             //Change the size of the circle depending on the acceleration
+             if(dx > dy && dx > 2) size = dx;
+             else if (dy > dx && dy > 2) size = dy;
+             else size = 2;
+
+             //Fill in the circle with white
+             fillCircle(x, y, size, WHITE);
+
+         //I2C*************************************************************
     }
 }
 
