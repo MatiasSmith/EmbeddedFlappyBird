@@ -138,12 +138,12 @@ unsigned long UARTDataCount = 0;
 
 
 //NEED TO UPDATE THIS FOR IT TO WORK!
-#define DATE                4     // Current Date
+#define DATE                7     // Current Date
 #define MONTH               3     // Month 1-12
 #define YEAR                2022  // Current year
-#define HOUR                01     // Time - hours
-#define MINUTE              57    // Time - minutes
-#define SECOND              00    // Time - seconds
+#define HOUR                9     // Time - hours
+#define MINUTE              45    // Time - minutes
+#define SECOND              30    // Time - seconds
 
 
 // What to transmit via SPI
@@ -1934,7 +1934,6 @@ int main() {
 
     long lRetVal = -1;
     BoardInit();
-    
     PinMuxConfig();
 
     MAP_PRCMPeripheralReset(CONSOLE_PERIPH);
@@ -2098,7 +2097,21 @@ int main() {
 
     int barrierY = 80;
     int barrierX = 125;
+
+    int barrier2Y = 40;
+    int barrier2X = 12;
+
+    int barrier3Y = 50;
+    int barrier3X = 20;
+
+    int barrier4Y = 20;
+    int barrier4X = 80;
+
     int height = 10;
+    int height2 = 10;
+    int height3 = 10;
+    int height4 = 10;
+
     while (1) {
 
         //UART_PRINT("charTyped: %c, ", charTyped);
@@ -2144,7 +2157,7 @@ int main() {
 
        }*/
 
-        if (roundsSurvived > 5 || level == -2) {
+        if (roundsSurvived > 30 || level == -2) {
             level++;
             powerUp = 0;
             setTextColor(BLACK, BLACK);
@@ -2254,7 +2267,8 @@ int main() {
                 //fillCircle(x, y, size, BLACK);
                 drawRect(x, y, size*3, size*3, BLACK);
             }
-            drawRect(barrierX, barrierY, 6, height, BLACK);
+            //drawRect(barrierX, barrierY, 6, height, BLACK);
+            //drawRect(barrier2X, barrier2Y, 6, height2, BLACK);
             //setTextColor(BLACK, BLACK);
             //setCursor(barrierX, barrierY);
             //Outstr('a');
@@ -2317,24 +2331,25 @@ int main() {
              else if (dy > dx && dy > 2) size = dy;
              else size = 2;
 
+             if (powerUp == 1) {
+                  drawRect(x, y, size*3, size*3, GREEN);
+                  continue;
+             }
+             drawRect(x, y, size*3, size*3, WHITE);
              //Fill in the circle with white
              //fillCircle(x, y, size, WHITE);
 
+             drawFastVLine(barrierX, barrierY, height, BLACK);
              if (barrierX == 0) {
                  barrierX = 125;
-                 height = (rand() % 20) + 10;
+                 height = (rand() % 20) + 15;
                  barrierY = 17 + (rand() % (108 - height));
                  roundsSurvived++;
              }
              else barrierX--;
 
-             drawRect(barrierX, barrierY, 6, height , WHITE);
+             drawFastVLine(barrierX, barrierY, height , WHITE);
 
-             if (powerUp == 1) {
-                 drawRect(x, y, size*3, size*3, GREEN);
-                 continue;
-             }
-             drawRect(x, y, size*3, size*3, WHITE);
              //setTextColor(GREEN, BLACK);
              //setCursor(barrierX, barrierY);
              //Outstr('a');
@@ -2345,6 +2360,76 @@ int main() {
                      level = -2;
                  }
              }
+
+             drawFastVLine(barrier2X, barrier2Y, height2, BLACK);
+             if (barrier2X == 0) {
+                 barrier2X = 125;
+                 height2 = (rand() % 20) + 15;
+                 barrier2Y = 50 + (rand() % (50 - height2));
+                 roundsSurvived++;
+             }
+             else barrier2X--;
+
+             drawFastVLine(barrier2X, barrier2Y, height2 , WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if(x + 6 == barrier2X) {
+                 if (y <= barrier2Y + height2 && y >= barrier2Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+             drawFastVLine(barrier3X, barrier3Y, height3, BLACK);
+             drawFastVLine(barrier3X + 60, barrier3Y, height3, BLACK);
+             if (barrier3X == 0) {
+                 barrier3X = 125;
+                 height3 = (rand() % 20) + 15;
+                 barrier3Y = 17 + (rand() % (50 - height3));
+                 roundsSurvived++;
+             }
+             else barrier3X--;
+
+             drawFastVLine(barrier3X, barrier3Y, height3 , WHITE);
+             drawFastVLine(barrier3X + 60, barrier3Y, height3, WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if((x + 6 == barrier3X) | (x + 6 == barrier3X + 60)) {
+                 if (y <= barrier3Y + height3 && y >= barrier3Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+             drawFastVLine(barrier4X, barrier4Y, height4, BLACK);
+             if (barrier4X == 0) {
+                 barrier4X = 125;
+                 height4 = (rand() % 20) + 15;
+                 barrier4Y = 17 + (rand() % (108 - height4));
+                 roundsSurvived++;
+             }
+             else barrier4X--;
+
+             drawFastVLine(barrier4X, barrier4Y, height4 , WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if(x + 6 == barrier4X) {
+                 if (y <= barrier4Y + height4 && y >= barrier4Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+
 
 
          //I2C*************************************************************
