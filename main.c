@@ -138,12 +138,12 @@ unsigned long UARTDataCount = 0;
 
 
 //NEED TO UPDATE THIS FOR IT TO WORK!
-#define DATE                4     // Current Date
+#define DATE                7     // Current Date
 #define MONTH               3     // Month 1-12
 #define YEAR                2022  // Current year
-#define HOUR                01     // Time - hours
-#define MINUTE              57    // Time - minutes
-#define SECOND              00    // Time - seconds
+#define HOUR                9     // Time - hours
+#define MINUTE              45    // Time - minutes
+#define SECOND              30    // Time - seconds
 
 
 // What to transmit via SPI
@@ -157,11 +157,12 @@ unsigned long UARTDataCount = 0;
 #define DATA1 "{\"state\": {\r\n\"desired\" : {\r\n\"var\" : "
 
 // Strings to transmit depending on how many times switch has been pressed
-#define DATAFIRST   "\"First\""
-#define DATASECOND  "\"Second\""
-#define DATATHIRD   "\"Third\""
-#define DATAFOURTH  "\"Fourth\""
-#define DATAFIFTH   "\"Fifth\""
+#define DATALOSS    "\"You Lost :(\""
+#define DATAFIRST   "\"You are in level 1, Goodluck!\""
+#define DATASECOND  "\"Level 2\""
+#define DATATHIRD   "\"Level 3\""
+#define DATAFOURTH  "\"Level 4\""
+#define DATAFIFTH   "\"You Won!\""
 
 #define DATA3 "\r\n}}}\r\n\r\n"
 
@@ -883,6 +884,9 @@ int connectToAccessPoint() {
 void getStringLength(int number) {
 
     switch(number) {
+    case -1:
+        length = strlen(DATALOSS);   //"you lost"
+        break;
     case 1:
         length = strlen(DATAFIRST);  //"First"
         break;
@@ -896,7 +900,7 @@ void getStringLength(int number) {
         length = strlen(DATAFOURTH); //"Fourth"
         break;
     case 5:
-        length = strlen(DATAFIFTH);  //"Fifth"
+        length = strlen(DATAFIFTH);  //"You won"
         break;
     default:
         break;
@@ -1481,6 +1485,8 @@ int entered = 0;
 char cCharacter;
 char colorArray[100];
 int colorArrayIndex = -1;
+int stringUpdated = 0;
+char charTyped = 'z';
 
 
 int button0[50] = {1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 2, 1, 2, 2, 2};
@@ -1587,7 +1593,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars0 = 0;
     }
     if(matchingChars0 >= 32){
-
+        stringUpdated = 1;
         stringToPrint[stringFinalIndex] = ' ';
         stringFinalIndex++;
 
@@ -1608,12 +1614,14 @@ static void GPIOA1IntHandler(void) {
      * pressed.
      */
     if(matchingChars2 >= 32){
-
+        stringUpdated = 1;
         if (previousButton == 2 && repeatedCharTime == 1) {
             if (B2Index == 2) B2Index = 0;
             else B2Index++;
             stringFinalIndex--;
             stringToPrint[stringFinalIndex] = B2Str[B2Index];
+            //charTyped = B2Str[B2Index];  //CHAR TYPED
+            //UART_PRINT("charTyped: %c, ", B2Str[B2Index]);
         }
         else {
             B2Index = 0;
@@ -1632,7 +1640,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars3 = 0;
     }
     if(matchingChars3 >= 32){
-
+        stringUpdated = 1;
         if (previousButton == 3 && repeatedCharTime == 1) {
             if (B3Index == 2) B3Index = 0;
             else B3Index++;
@@ -1656,6 +1664,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars4 = 0;
     }
     if(matchingChars4 >= 32){
+        stringUpdated = 1;
         if (previousButton == 4 && repeatedCharTime == 1) {
             if (B4Index == 2) B4Index = 0;
             else B4Index++;
@@ -1678,6 +1687,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars5 = 0;
     }
     if(matchingChars5 >= 32){
+        stringUpdated = 1;
         if (previousButton == 5 && repeatedCharTime == 1) {
             if (B5Index == 2) B5Index = 0;
             else B5Index++;
@@ -1700,6 +1710,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars6 = 0;
     }
     if(matchingChars6 >= 32){
+        stringUpdated = 1;
         if (previousButton == 6 && repeatedCharTime == 1) {
             if (B6Index == 2) B6Index = 0;
             else B6Index++;
@@ -1722,6 +1733,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars7 = 0;
     }
     if(matchingChars7 >= 32){
+        stringUpdated = 1;
         if (previousButton == 7 && repeatedCharTime == 1) {
             if (B7Index == 3) B7Index = 0;
             else B7Index++;
@@ -1744,6 +1756,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars8 = 0;
     }
     if(matchingChars8 >= 32){
+        stringUpdated = 1;
         if (previousButton == 8 && repeatedCharTime == 1) {
             if (B8Index == 2) B8Index = 0;
             else B8Index++;
@@ -1766,6 +1779,7 @@ static void GPIOA1IntHandler(void) {
         matchingChars9 = 0;
     }
     if(matchingChars9 >= 32){
+        stringUpdated = 1;
         if (previousButton == 9 && repeatedCharTime == 1) {
             if (B9Index == 3) B9Index = 0;
             else B9Index++;
@@ -1800,7 +1814,7 @@ static void GPIOA1IntHandler(void) {
         matchingCharsLAST = 0;
     }
     if(matchingCharsLAST >= 32){
-
+        stringUpdated = 1;
         if (stringFinalIndex > 0) stringFinalIndex--;
         stringToPrint[stringFinalIndex] = ' ';
         previousButton = 11;
@@ -1920,7 +1934,6 @@ int main() {
 
     long lRetVal = -1;
     BoardInit();
-    
     PinMuxConfig();
 
     MAP_PRCMPeripheralReset(CONSOLE_PERIPH);
@@ -2059,20 +2072,54 @@ int main() {
 
     /* Set the initial font color to green */
     setTextColor(GREEN, BLACK);
-    char fontColor[10] = "GREEN";
-    char fontText[30] = "Font Color: ";
+    int level = 1;
+    int roundsSurvived = 0;
+    char fontColor[10];
+    sprintf(fontColor, "%d", level);
+    char fontText[30] = "Level: ";
     char fontPrint[30];
-    char colorPrint[30];
+    //char colorPrint[30];
+
     fillScreen(BLACK);
     strcpy(fontPrint, fontText);
     strcat(fontPrint, fontColor);
 
     setCursor(1, 8);
     Outstr(fontPrint);
+
+    setCursor(70, 8);
+    Outstr("Type: a");
+
+    int powerUp = 0;
+    DATAmessage = level;
+    getStringLength(DATAmessage);
+    http_post(lRetVal);
+
+    int barrierY = 80;
+    int barrierX = 125;
+
+    int barrier2Y = 40;
+    int barrier2X = 12;
+
+    int barrier3Y = 50;
+    int barrier3X = 20;
+
+    int barrier4Y = 20;
+    int barrier4X = 80;
+
+    int height = 10;
+    int height2 = 10;
+    int height3 = 10;
+    int height4 = 10;
+
     while (1) {
 
+        //UART_PRINT("charTyped: %c, ", charTyped);
+        if (stringToPrint[0] == 'a') {
+            powerUp = 1;
+        }
         /* Update the font color */
-        if (colorUpdated == 1) {
+        /*if (colorUpdated == 1) {
             colorUpdated = 0;
             setCursor(1, 8);
             setTextColor(BLACK, BLACK);
@@ -2108,11 +2155,51 @@ int main() {
             strcat(fontPrint, colorPrint);
             Outstr(fontPrint);
 
-       }
+       }*/
 
-        setCursor(1, 20);
-        Outstr(stringToPrint);
-        delay(50);
+        if (roundsSurvived > 30 || level == -2) {
+            level++;
+            powerUp = 0;
+            setTextColor(BLACK, BLACK);
+            setCursor(1, 8);
+            Outstr(fontPrint);
+            setTextColor(GREEN, BLACK);
+
+            // Get the length of the string that will be printed
+            DATAmessage = level;
+            getStringLength(DATAmessage);
+
+            // Print message
+            http_post(lRetVal);
+
+            if (level == 5) {
+
+                setCursor(1, 8);
+                Outstr("You Win!!");
+                break;
+            }
+            if (level == -1) {
+                setCursor(1, 8);
+                Outstr("You lost :(");
+                break;
+            }
+            sprintf(fontColor, "%d", level);
+            strcpy(fontPrint, fontText);
+            strcat(fontPrint, fontColor);
+
+            setCursor(1, 8);
+            Outstr(fontPrint);
+
+            roundsSurvived = 0;
+        }
+
+
+        if (stringUpdated == 1) {
+            setCursor(1, 20);
+            Outstr(stringToPrint);
+            stringUpdated = 0;
+        }
+        //delay(1);
 
         /*
          * If the enter key was pressed, we transmit the current
@@ -2177,8 +2264,14 @@ int main() {
 
             //Only delete previous circle if SW3 not pushed. This allows us to draw
             if (!GPIOPinRead(GPIOA1_BASE, 0x20)) {
-                fillCircle(x, y, size, BLACK);
+                //fillCircle(x, y, size, BLACK);
+                drawRect(x, y, size*3, size*3, BLACK);
             }
+            //drawRect(barrierX, barrierY, 6, height, BLACK);
+            //drawRect(barrier2X, barrier2Y, 6, height2, BLACK);
+            //setTextColor(BLACK, BLACK);
+            //setCursor(barrierX, barrierY);
+            //Outstr('a');
             //UART_PRINT("Hello");
 
              //Handle tilting top of screen down
@@ -2187,9 +2280,10 @@ int main() {
                     y = y - dy;
 
                     //If ball goes off screen
-                    if(y < 0) {
-                        fillScreen(BLACK);
-                        y = 127;
+                    if(y < 17) {
+                        //fillScreen(BLACK);
+                        //y = 127;
+                        y = 17;
                     }
 
                }
@@ -2199,9 +2293,10 @@ int main() {
                     y = y + dy;
 
                     //If ball goes off screen
-                    if(y > 127) {
-                        fillScreen(BLACK);
-                        y = 0;
+                    if(y > 121) {
+                        //fillScreen(BLACK);
+                        //y = 0;
+                        y = 121;
                     }
              }
 
@@ -2212,8 +2307,9 @@ int main() {
 
                     //If ball goes off screen
                     if(x < 0) {
-                        fillScreen(BLACK);
-                        x = 127;
+                        //fillScreen(BLACK);
+                        //x = 127;
+                        x = 0;
                     }
                }
 
@@ -2223,9 +2319,10 @@ int main() {
                     x = x + dx;
 
                     //If ball goes off screen
-                    if(x > 127) {
-                        fillScreen(BLACK);
-                        x = 0;
+                    if(x > 121) {
+                        //fillScreen(BLACK);
+                        //x = 0;
+                        x = 121;
                     }
               }
 
@@ -2234,8 +2331,106 @@ int main() {
              else if (dy > dx && dy > 2) size = dy;
              else size = 2;
 
+             if (powerUp == 1) {
+                  drawRect(x, y, size*3, size*3, GREEN);
+                  continue;
+             }
+             drawRect(x, y, size*3, size*3, WHITE);
              //Fill in the circle with white
-             fillCircle(x, y, size, WHITE);
+             //fillCircle(x, y, size, WHITE);
+
+             drawFastVLine(barrierX, barrierY, height, BLACK);
+             if (barrierX == 0) {
+                 barrierX = 125;
+                 height = (rand() % 20) + 15;
+                 barrierY = 17 + (rand() % (108 - height));
+                 roundsSurvived++;
+             }
+             else barrierX--;
+
+             drawFastVLine(barrierX, barrierY, height , WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if(x + 6 == barrierX) {
+                 if (y <= barrierY + height && y >= barrierY - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+             drawFastVLine(barrier2X, barrier2Y, height2, BLACK);
+             if (barrier2X == 0) {
+                 barrier2X = 125;
+                 height2 = (rand() % 20) + 15;
+                 barrier2Y = 50 + (rand() % (50 - height2));
+                 roundsSurvived++;
+             }
+             else barrier2X--;
+
+             drawFastVLine(barrier2X, barrier2Y, height2 , WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if(x + 6 == barrier2X) {
+                 if (y <= barrier2Y + height2 && y >= barrier2Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+             drawFastVLine(barrier3X, barrier3Y, height3, BLACK);
+             drawFastVLine(barrier3X + 60, barrier3Y, height3, BLACK);
+             if (barrier3X == 0) {
+                 barrier3X = 125;
+                 height3 = (rand() % 20) + 15;
+                 barrier3Y = 17 + (rand() % (50 - height3));
+                 roundsSurvived++;
+             }
+             else barrier3X--;
+
+             drawFastVLine(barrier3X, barrier3Y, height3 , WHITE);
+             drawFastVLine(barrier3X + 60, barrier3Y, height3, WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if((x + 6 == barrier3X) | (x + 6 == barrier3X + 60)) {
+                 if (y <= barrier3Y + height3 && y >= barrier3Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+             drawFastVLine(barrier4X, barrier4Y, height4, BLACK);
+             if (barrier4X == 0) {
+                 barrier4X = 125;
+                 height4 = (rand() % 20) + 15;
+                 barrier4Y = 17 + (rand() % (108 - height4));
+                 roundsSurvived++;
+             }
+             else barrier4X--;
+
+             drawFastVLine(barrier4X, barrier4Y, height4 , WHITE);
+
+             //setTextColor(GREEN, BLACK);
+             //setCursor(barrierX, barrierY);
+             //Outstr('a');
+
+             if(x + 6 == barrier4X) {
+                 if (y <= barrier4Y + height4 && y >= barrier4Y - 5) {
+                     //delay(500);
+                     level = -2;
+                 }
+             }
+
+
+
 
          //I2C*************************************************************
     }
@@ -2294,10 +2489,13 @@ static int http_post(int iTLSSockID){
     strcpy(pcBufHeaders, DATA1);
     pcBufHeaders += strlen(DATA1);
 
-    strcpy(pcBufHeaders, DATAFIRST);
+    //strcpy(pcBufHeaders, DATAFIRST);
 
     // Insert the message corresponding to the value of DATAmessage into the total string
     switch(DATAmessage) {
+    case -1:
+        strcpy(pcBufHeaders, DATALOSS);
+        break;
     case 1:
         strcpy(pcBufHeaders, DATAFIRST);
         break;
