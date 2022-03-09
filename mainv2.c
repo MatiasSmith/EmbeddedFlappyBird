@@ -1831,71 +1831,6 @@ static void GPIOA1IntHandler(void) {
     clock = 0;
 }
 
-/* Interrupt everytime incoming UART signal detected */
-/*
-void UARTIntHandler(void) {
-
-    // Keep collecting data while there is data in the buffer
-    while(UARTCharsAvail(CONSOLE)) {
-        UARTData = UARTCharGetNonBlocking(CONSOLE);
-        UARTDataBuffer[UARTDataCount] = UARTData;
-        UARTDataCount++;
-    }
-
-    // Maintaining the color of the incoming string
-    int color = (int)UARTDataBuffer[UARTDataCount-1];
-    UARTDataBuffer[UARTDataCount -1] = ' ';
-
-    setCursor(1, 80);
-    switch (color){
-                case 0:
-                    setTextColor(GREEN, BLACK);
-                    break;
-                case 1:
-                    setTextColor(MAGENTA, BLACK);
-                    break;
-                case 2:
-                    setTextColor(BLUE, BLACK);
-                    break;
-                case 3:
-                    setTextColor(CYAN, BLACK);
-                    break;
-                case 4:
-                    setTextColor(WHITE, BLACK);
-                    break;
-                default:
-                    break;
-                }
-    Outstr(UARTDataBuffer);
-
-    // Switching the color back
-    switch (colorIndex){
-                    case 0:
-                        setTextColor(GREEN, BLACK);
-                        break;
-                    case 1:
-                        setTextColor(MAGENTA, BLACK);
-                        break;
-                    case 2:
-                        setTextColor(BLUE, BLACK);
-                        break;
-                    case 3:
-                        setTextColor(CYAN, BLACK);
-                        break;
-                    case 4:
-                        setTextColor(WHITE, BLACK);
-                        break;
-                    default:
-                        break;
-                    }
-    memset(UARTDataBuffer, 0, strlen(UARTDataBuffer));
-    UARTDataCount = 0;
-
-    // Clear Interrupt
-    MAP_UARTIntClear(UARTA0_BASE,UART_INT_TX|UART_INT_RX);
-}
-*/
-
 //*****************************************************************************
 //
 //! Board Initialization & Configuration
@@ -1925,6 +1860,8 @@ BoardInit(void) {
 
     PRCMCC3200MCUInit();
 }
+
+
 //****************************************************************************
 //
 //! Main function
@@ -1944,10 +1881,11 @@ int main() {
 
     MAP_PRCMPeripheralReset(CONSOLE_PERIPH);
     InitTerm();
+
     //MAP_UARTFIFODisable(CONSOLE);
     ClearTerm();
 
-    //For Webservices******************************
+    /* Wifi connection and AWS Set up */
 
     UART_PRINT("My terminal works!\n\r");
 
@@ -1969,28 +1907,29 @@ int main() {
 
     //Webservice************************************
 
-    //I2C*******************************************
+    /* I2C Setup */
+
     int iRetVal;
     char acCmdStore[512];
 
-    //Variables to store the position of the circle on the screen
+    /* Variables to store the position of the circle on the screen */
     int x = 64;
     int y = 64;
     int dy;
     int dx;
     int size = 1;
 
-    // I2C Init
+    /* I2C Init */
     I2C_IF_Open(I2C_MASTER_MODE_FST);
 
-    // To store strings
+    /* To store strings */
     char* pcInpString;
 
-    // Commands to access registers
+    /* Commands to access registers */
     char test[20] = "0x18 0x3 1";
     char test2[20] = "0x5";
 
-    //Other strings necessary for eventually translating the register commands to integer values
+    /* Other strings necessary for eventually translating the register commands to integer values */
     unsigned char ucDevAddr, ucRegOffsetx, ucRegOffsety, ucRdLen;
     unsigned char aucRdDataBufx[256];
     unsigned char aucRdDataBufy[256];
@@ -1998,36 +1937,24 @@ int main() {
     char xhex[20];
     char yhex[20];
 
-    // Get the device address
+    /* Get the device address */
     pcInpString = strtok(test, " ");
     ucDevAddr = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
 
-    // Get the register offset address
+    /* Get the register offset address */
     pcInpString = strtok(NULL, " ");
     ucRegOffsetx = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
 
-    // Get the length of data to be read
+    /* Get the length of data to be read */
     pcInpString = strtok(NULL, " ");
     ucRdLen = (unsigned char)strtoul(pcInpString, &pcErrPtr, 10);
 
-    // Second register offset address
+    /* Second register offset address */
     pcInpString = strtok(test2, " ");
     ucRegOffsety = (unsigned char)strtoul(pcInpString+2, &pcErrPtr, 16);
 
 
-
-
-    //I2C*******************************************
-
-    //UART---------------------------------
-
-    /* Register UART interrupt handler */
-    //MAP_UARTIntRegister(CONSOLE,UARTIntHandler);
-
-    /* Enable UART rx */
-    //MAP_UARTIntEnable(CONSOLE,UART_INT_RX);
-
-    //SPI------------------------------
+    /* SPI Set up */
 
     /*Enable the SPI module clock */
      MAP_PRCMPeripheralClkEnable(PRCM_GSPI,PRCM_RUN_MODE_CLK);
@@ -2068,18 +1995,17 @@ int main() {
     /* Interrupt on rising edge */
     MAP_GPIOIntTypeSet(GPIOA0_BASE, 0x80, GPIO_RISING_EDGE);
 
-
     /* Clear interrupts on base A3*/
     ulStatus = MAP_GPIOIntStatus (GPIOA0_BASE, false);
     MAP_GPIOIntClear(GPIOA0_BASE, ulStatus);
 
     MAP_GPIOIntEnable(GPIOA0_BASE, 0x80);
 
-    GPIODirModeSet(GPIOA1_BASE, 0x2, 0);
-    GPIODirModeSet(GPIOA1_BASE, 0x8, 0);
-    GPIODirModeSet(GPIOA1_BASE, 0x20, 0);
+    //GPIODirModeSet(GPIOA1_BASE, 0x2, 0);
+    //GPIODirModeSet(GPIOA1_BASE, 0x8, 0);
+    //GPIODirModeSet(GPIOA1_BASE, 0x20, 0);
 
-
+    /* Initialize barrier as moving up or down*/
     int barrierup = 0;
     int barrierup2 = 1;
     int barrierup3 = 0;
@@ -2093,12 +2019,12 @@ int main() {
     sprintf(fontColor, "%d", level);
     char fontText[30] = "Level: ";
     char fontPrint[30];
-    //char colorPrint[30];
 
     fillScreen(BLACK);
     strcpy(fontPrint, fontText);
     strcat(fontPrint, fontColor);
 
+    /* Print initial power up character */
     setCursor(1, 8);
     char character[2];
     strcpy(character, alphabet[rand() % 7]);
@@ -2116,6 +2042,7 @@ int main() {
     getStringLength(DATAmessage);
     http_post(lRetVal);
 
+    /* Initialize coordinates of each barrier */
     int barrierY = 80;
     int barrierX = 125;
 
@@ -2133,13 +2060,13 @@ int main() {
     int height3 = 10;
     int height4 = 10;
 
-    GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
-    GPIO_IF_LedOff(MCU_ORANGE_LED_GPIO);
+    //GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
+    //GPIO_IF_LedOff(MCU_ORANGE_LED_GPIO);
 
+    /* Main driving while loop */
     while (1) {
 
-        GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
-        //UART_PRINT("charTyped: %c, ", charTyped);
+        /* If we typed the specified character */
         if (!strcmp(stringToPrint, character)) {
             powerUp = 200;
             strcpy(stringToPrint, "");
@@ -2155,49 +2082,14 @@ int main() {
 
 
         }
-        /* Update the font color */
-        /*if (colorUpdated == 1) {
-            colorUpdated = 0;
-            setCursor(1, 8);
-            setTextColor(BLACK, BLACK);
-            Outstr(fontPrint);
-            strcpy(fontPrint, fontText);
 
-            switch (colorIndex){
-            case 0:
-                setTextColor(GREEN, BLACK);
-                strcpy(colorPrint, "GREEN");
-                break;
-            case 1:
-                setTextColor(MAGENTA, BLACK);
-                strcpy(colorPrint, "MAGENTA");
-                break;
-            case 2:
-                setTextColor(BLUE, BLACK);
-                strcpy(colorPrint, "BLUE");
-                break;
-            case 3:
-                setTextColor(CYAN, BLACK);
-                strcpy(colorPrint, "CYAN");
-                break;
-            case 4:
-                setTextColor(WHITE, BLACK);
-                strcpy(colorPrint, "WHITE");
-                break;
-            default:
-                break;
-
-            }
-            setCursor(1, 8);
-            strcat(fontPrint, colorPrint);
-            Outstr(fontPrint);
-
-       }*/
+        /* Decrement Power up variable with each iteration */
         if (powerUp > 0) {
             powerUp--;
         }
 
-        if (roundsSurvived > 15 || level == -2) {
+        /* Move on to next level if we survive 15 more barriers passing */
+        if (roundsSurvived > 15) {
             level++;
 
             setTextColor(BLACK, BLACK);
@@ -2209,7 +2101,7 @@ int main() {
             DATAmessage = level;
             getStringLength(DATAmessage);
 
-            // Print message
+            /* Send level or winning message via email */
             http_post(lRetVal);
 
             if (level == 5) {
@@ -2219,12 +2111,7 @@ int main() {
                 GPIO_IF_LedOn(MCU_GREEN_LED_GPIO);
                 break;
             }
-            if (level == -1) {
-                setCursor(1, 8);
-                Outstr("You lost :(");
-                GPIO_IF_LedOn(MCU_RED_LED_GPIO);
-                break;
-            }
+
             sprintf(fontColor, "%d", level);
             strcpy(fontPrint, fontText);
             strcat(fontPrint, fontColor);
@@ -2235,40 +2122,16 @@ int main() {
             roundsSurvived = 0;
         }
 
-
         if (stringUpdated == 1) {
             setCursor(1, 20);
             Outstr(stringToPrint);
             stringUpdated = 0;
         }
-        //delay(1);
 
-        /*
-         * If the enter key was pressed, we transmit the current
-         * string to the other board via UART.
-         */
-        /*if(entered == 1) {
-
-                    char colorValue[2];
-                    char printable[30];
-                    colorValue[0] = colorArray[colorArrayIndex];
-                    strcpy(printable, stringToPrint);
-                    strcat(printable, colorValue);
-                    Message(printable);
-                    entered = 0;
-         }*/
-
-        //For Webservices***********************************************
-
-
-        /* Freeze the frame if button 3 pressed */
+        /* Freeze the frame if switch 3 pressed */
         while(GPIOPinRead(GPIOA1_BASE, 0x20)) {}
 
-
-        //Webservices*****************************************************
-
-
-        //I2C*************************************************************
+        /* I2C */
         I2C_IF_Write(ucDevAddr,&ucRegOffsetx,1,0);
 
             // Read the specified length of data
@@ -2283,13 +2146,9 @@ int main() {
             //Convert hex values to integers
             sprintf(xhex, "%x", aucRdDataBufx[0]);
             int i = (int)strtol((char*)xhex, NULL, 16);
-            //UART_PRINT("UART i %d, ", i);
-
 
             sprintf(yhex, "%x", aucRdDataBufy[0]);
             int j = (int)strtol((char*)yhex, NULL, 16);
-            //UART_PRINT("UART j %d, ", j);
-
 
             //Only delete previous circle if SW3 not pushed. This allows us to draw
             if (!GPIOPinRead(GPIOA1_BASE, 0x20)) {
@@ -2395,8 +2254,6 @@ int main() {
                   drawRect(x, y, size*3, size*3, GREEN);
              }
              else drawRect(x, y, size*3, size*3, WHITE);
-             //Fill in the circle with white
-             //fillCircle(x, y, size, WHITE);
 
              //drawFastVLine(barrierX, barrierY, height, BLACK);
              if (barrierX == 0) {
@@ -2428,10 +2285,6 @@ int main() {
              }
 
              drawFastVLine(barrierX, barrierY, height , WHITE);
-
-             //setTextColor(GREEN, BLACK);
-             //setCursor(barrierX, barrierY);
-             //Outstr('a');
 
              if (x + 6 >= barrierX && x <= barrierX && powerUp < 1) {
                  if (y <= barrierY + height && y >= barrierY - 5) {
@@ -2471,10 +2324,6 @@ int main() {
              }
 
              drawFastVLine(barrier2X, barrier2Y, height2 , WHITE);
-
-             //setTextColor(GREEN, BLACK);
-             //setCursor(barrierX, barrierY);
-             //Outstr('a');
 
              if(x + 6 >= barrier2X && x <= barrier2X && powerUp < 1) {
                  if (y <= barrier2Y + height2 && y >= barrier2Y - 5) {
@@ -2516,10 +2365,6 @@ int main() {
              drawFastVLine(barrier3X, barrier3Y, height3 , WHITE);
              drawFastVLine(barrier3X + 60, barrier3Y, height3, WHITE);
 
-             //setTextColor(GREEN, BLACK);
-             //setCursor(barrierX, barrierY);
-             //Outstr('a');
-
              if(((x + 6 >= barrier3X && x <= barrier3X) | (x + 6 >= barrier3X + 60 && x <= barrier3X + 60)) && powerUp < 1) {
                  if (y <= barrier3Y + height3 && y >= barrier3Y - 5) {
                      //delay(500);
@@ -2558,15 +2403,31 @@ int main() {
 
              drawFastVLine(barrier4X, barrier4Y, height4 , WHITE);
 
-             //setTextColor(GREEN, BLACK);
-             //setCursor(barrierX, barrierY);
-             //Outstr('a');
-
              if(x + 6 >= barrier4X && x <= barrier4X && powerUp < 1) {
                  if (y <= barrier4Y + height4 && y >= barrier4Y - 5) {
                      //delay(500);
                      level = -2;
                  }
+             }
+
+             /* Game over */
+             if (level == -2) {
+
+                 setTextColor(BLACK, BLACK);
+                 setCursor(1, 8);
+                 Outstr(fontPrint);
+                 setTextColor(GREEN, BLACK);
+
+                 // Get the length of the string that will be printed
+                 DATAmessage = -1;
+                 getStringLength(DATAmessage);
+
+                 /* Send losing message via email */
+                 http_post(lRetVal);
+                 setCursor(1, 8);
+                 Outstr("You lost :(");
+                 GPIO_IF_LedOn(MCU_RED_LED_GPIO);
+                 break;
              }
 
          //I2C*************************************************************
