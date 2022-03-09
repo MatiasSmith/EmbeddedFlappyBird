@@ -1478,6 +1478,7 @@ char B6Str[5] = {'m', 'n', 'o'};
 char B7Str[5] = {'p', 'q', 'r', 's'};
 char B8Str[5] = {'t', 'u', 'v'};
 char B9Str[5] = {'w', 'x', 'y', 'z'};
+char alphabet[30][2] = {"a", "d", "g", "j", "m", "p", "t", "w"};
 int previousButton = 0;
 int colorIndex;
 int colorUpdated = 0;
@@ -1565,6 +1566,11 @@ static void GPIOA1IntHandler(void) {
         repeatedCharTime = 0;
     }
 
+    if (stringFinalIndex == 1) {
+        strcpy(stringToPrint, "");
+        stringFinalIndex = 0;
+        stringUpdated = 1;
+    }
     /* Button 1 for changing font color */
     if(num_cycles == button1[matchingChars1]) {
         matchingChars1++;
@@ -2069,6 +2075,15 @@ int main() {
 
     MAP_GPIOIntEnable(GPIOA0_BASE, 0x80);
 
+    GPIODirModeSet(GPIOA1_BASE, 0x2, 0);
+    GPIODirModeSet(GPIOA1_BASE, 0x8, 0);
+    GPIODirModeSet(GPIOA1_BASE, 0x20, 0);
+
+
+    int barrierup = 0;
+    int barrierup2 = 1;
+    int barrierup3 = 0;
+    int barrierup4 = 1;
 
     /* Set the initial font color to green */
     setTextColor(GREEN, BLACK);
@@ -2085,10 +2100,16 @@ int main() {
     strcat(fontPrint, fontColor);
 
     setCursor(1, 8);
+    char character[2];
+    strcpy(character, alphabet[rand() % 7]);
     Outstr(fontPrint);
+    setCursor(110, 8);
+    Outstr(character);
 
     setCursor(70, 8);
-    Outstr("Type: a");
+    Outstr("Power:");
+    setCursor(110, 8);
+    Outstr(character);
 
     int powerUp = 0;
     DATAmessage = level;
@@ -2112,11 +2133,27 @@ int main() {
     int height3 = 10;
     int height4 = 10;
 
+    GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
+    GPIO_IF_LedOff(MCU_ORANGE_LED_GPIO);
+
     while (1) {
 
+        GPIO_IF_LedOff(MCU_GREEN_LED_GPIO);
         //UART_PRINT("charTyped: %c, ", charTyped);
-        if (stringToPrint[0] == 'a') {
-            powerUp = 1;
+        if (!strcmp(stringToPrint, character)) {
+            powerUp = 200;
+            strcpy(stringToPrint, "");
+            stringFinalIndex = 0;
+            stringUpdated = 1;
+            setTextColor(BLACK, BLACK);
+            setCursor(110, 8);
+            Outstr(character);
+            setTextColor(GREEN, BLACK);
+            setCursor(110, 8);
+            strcpy(character, alphabet[rand() % 7]);
+            Outstr(character);
+
+
         }
         /* Update the font color */
         /*if (colorUpdated == 1) {
@@ -2156,10 +2193,13 @@ int main() {
             Outstr(fontPrint);
 
        }*/
+        if (powerUp > 0) {
+            powerUp--;
+        }
 
-        if (roundsSurvived > 30 || level == -2) {
+        if (roundsSurvived > 15 || level == -2) {
             level++;
-            powerUp = 0;
+
             setTextColor(BLACK, BLACK);
             setCursor(1, 8);
             Outstr(fontPrint);
@@ -2176,11 +2216,13 @@ int main() {
 
                 setCursor(1, 8);
                 Outstr("You Win!!");
+                GPIO_IF_LedOn(MCU_GREEN_LED_GPIO);
                 break;
             }
             if (level == -1) {
                 setCursor(1, 8);
                 Outstr("You lost :(");
+                GPIO_IF_LedOn(MCU_RED_LED_GPIO);
                 break;
             }
             sprintf(fontColor, "%d", level);
@@ -2219,22 +2261,9 @@ int main() {
         //For Webservices***********************************************
 
 
-        if (GPIOPinRead(GPIOA1_BASE, 0x20)) {
+        /* Freeze the frame if button 3 pressed */
+        while(GPIOPinRead(GPIOA1_BASE, 0x20)) {}
 
-                    // Determine which message to print
-                    DATAmessage++;
-                    if (DATAmessage > 5) {
-                        DATAmessage = 1;
-                    }
-                    // Get the length of the string that will be printed
-                    getStringLength(DATAmessage);
-
-                    // Print message
-                    http_post(lRetVal);
-
-                    // Wait for user to release button
-                    while(GPIOPinRead(GPIOA1_BASE, 0x20)) {}
-        }
 
         //Webservices*****************************************************
 
@@ -2273,17 +2302,31 @@ int main() {
             //setCursor(barrierX, barrierY);
             //Outstr('a');
             //UART_PRINT("Hello");
+            drawFastVLine(barrierX, barrierY, height, BLACK);
+            drawFastVLine(barrier2X, barrier2Y, height2, BLACK);
+            drawFastVLine(barrier3X, barrier3Y, height3, BLACK);
+            drawFastVLine(barrier3X + 60, barrier3Y, height3, BLACK);
+            drawFastVLine(barrier4X, barrier4Y, height4, BLACK);
 
              //Handle tilting top of screen down
              if (i > 80) {
                     dy = (255 - i)/14;
                     y = y - dy;
 
+                    //if(barrierY > 21 && barrier2Y > 21 && barrier3Y > 21 && barrier4Y > 21) {
+                    //    barrierY = barrierY - 1;
+                    //    barrier2Y = barrier2Y - 1;
+                    //    barrier3Y = barrier3Y - 1;
+                    //    barrier4Y = barrier4Y - 1;
+                    //}
                     //If ball goes off screen
+
+
                     if(y < 17) {
                         //fillScreen(BLACK);
                         //y = 127;
                         y = 17;
+
                     }
 
                }
@@ -2291,6 +2334,13 @@ int main() {
                else {
                     dy = i/14;
                     y = y + dy;
+
+                    //if(barrierY + height - 5 < 127 && barrier2Y + height2 - 5 < 127 && barrier3Y + height3 - 5 < 127 && barrier4Y + height4 - 5 < 127) {
+                    //    barrierY = barrierY + 1;
+                    //    barrier2Y = barrier2Y + 1;
+                    //    barrier3Y = barrier3Y + 1;
+                    //    barrier4Y = barrier4Y + 1;
+                    //}
 
                     //If ball goes off screen
                     if(y > 121) {
@@ -2305,6 +2355,11 @@ int main() {
                     dx = (255 - j)/14;
                     x = x - dx;
 
+                    //barrierX = barrierX - 1;
+                    //barrier2X = barrier2X - 1;
+                    //barrier3X = barrier3X - 1;
+                    //barrier4X = barrier4X - 1;
+
                     //If ball goes off screen
                     if(x < 0) {
                         //fillScreen(BLACK);
@@ -2318,6 +2373,10 @@ int main() {
                     dx = j/14;
                     x = x + dx;
 
+                    //barrierX = barrierX + 1;
+                    //barrier2X = barrier2X + 1;
+                    //barrier3X = barrier3X + 1;
+                    //barrier4X = barrier4X + 1;
                     //If ball goes off screen
                     if(x > 121) {
                         //fillScreen(BLACK);
@@ -2331,15 +2390,15 @@ int main() {
              else if (dy > dx && dy > 2) size = dy;
              else size = 2;
 
-             if (powerUp == 1) {
+             if (powerUp > 0) {
+                  GPIO_IF_LedOn(MCU_GREEN_LED_GPIO);
                   drawRect(x, y, size*3, size*3, GREEN);
-                  continue;
              }
-             drawRect(x, y, size*3, size*3, WHITE);
+             else drawRect(x, y, size*3, size*3, WHITE);
              //Fill in the circle with white
              //fillCircle(x, y, size, WHITE);
 
-             drawFastVLine(barrierX, barrierY, height, BLACK);
+             //drawFastVLine(barrierX, barrierY, height, BLACK);
              if (barrierX == 0) {
                  barrierX = 125;
                  height = (rand() % 20) + 15;
@@ -2348,20 +2407,40 @@ int main() {
              }
              else barrierX--;
 
+             if (level > 1) {
+                 if (barrierup == 1) {
+                     if (barrierY > 17) {
+                         barrierY--;
+                     }
+                     else {
+                         barrierup = 0;
+                     }
+                 }
+                 else {
+                     if (barrierY + height - 5 < 122) {
+                         barrierY++;
+                     }
+                     else {
+                         barrierup = 1;
+                     }
+
+                 }
+             }
+
              drawFastVLine(barrierX, barrierY, height , WHITE);
 
              //setTextColor(GREEN, BLACK);
              //setCursor(barrierX, barrierY);
              //Outstr('a');
 
-             if(x + 6 == barrierX) {
+             if (x + 6 >= barrierX && x <= barrierX && powerUp < 1) {
                  if (y <= barrierY + height && y >= barrierY - 5) {
                      //delay(500);
                      level = -2;
                  }
              }
 
-             drawFastVLine(barrier2X, barrier2Y, height2, BLACK);
+             //drawFastVLine(barrier2X, barrier2Y, height2, BLACK);
              if (barrier2X == 0) {
                  barrier2X = 125;
                  height2 = (rand() % 20) + 15;
@@ -2370,21 +2449,42 @@ int main() {
              }
              else barrier2X--;
 
+             /* For barrier moving up and down */
+             if (level > 2) {
+                 if (barrierup2 == 1) {
+                     if (barrier2Y > 17) {
+                         barrier2Y--;
+                     }
+                     else {
+                         barrierup2 = 0;
+                     }
+                 }
+                 else {
+                     if (barrier2Y + height2 - 5 < 122) {
+                         barrier2Y++;
+                     }
+                     else {
+                         barrierup2 = 1;
+                     }
+
+                 }
+             }
+
              drawFastVLine(barrier2X, barrier2Y, height2 , WHITE);
 
              //setTextColor(GREEN, BLACK);
              //setCursor(barrierX, barrierY);
              //Outstr('a');
 
-             if(x + 6 == barrier2X) {
+             if(x + 6 >= barrier2X && x <= barrier2X && powerUp < 1) {
                  if (y <= barrier2Y + height2 && y >= barrier2Y - 5) {
                      //delay(500);
                      level = -2;
                  }
              }
 
-             drawFastVLine(barrier3X, barrier3Y, height3, BLACK);
-             drawFastVLine(barrier3X + 60, barrier3Y, height3, BLACK);
+             //drawFastVLine(barrier3X, barrier3Y, height3, BLACK);
+             //drawFastVLine(barrier3X + 60, barrier3Y, height3, BLACK);
              if (barrier3X == 0) {
                  barrier3X = 125;
                  height3 = (rand() % 20) + 15;
@@ -2393,6 +2493,26 @@ int main() {
              }
              else barrier3X--;
 
+             if (level > 2) {
+                 if (barrierup3 == 1) {
+                     if (barrier3Y > 17) {
+                         barrier3Y--;
+                     }
+                     else {
+                         barrierup3 = 0;
+                     }
+                 }
+                 else {
+                     if (barrier3Y + height3 - 5 < 122) {
+                         barrier3Y++;
+                     }
+                     else {
+                         barrierup3 = 1;
+                     }
+
+                 }
+             }
+
              drawFastVLine(barrier3X, barrier3Y, height3 , WHITE);
              drawFastVLine(barrier3X + 60, barrier3Y, height3, WHITE);
 
@@ -2400,14 +2520,14 @@ int main() {
              //setCursor(barrierX, barrierY);
              //Outstr('a');
 
-             if((x + 6 == barrier3X) | (x + 6 == barrier3X + 60)) {
+             if(((x + 6 >= barrier3X && x <= barrier3X) | (x + 6 >= barrier3X + 60 && x <= barrier3X + 60)) && powerUp < 1) {
                  if (y <= barrier3Y + height3 && y >= barrier3Y - 5) {
                      //delay(500);
                      level = -2;
                  }
              }
 
-             drawFastVLine(barrier4X, barrier4Y, height4, BLACK);
+             //drawFastVLine(barrier4X, barrier4Y, height4, BLACK);
              if (barrier4X == 0) {
                  barrier4X = 125;
                  height4 = (rand() % 20) + 15;
@@ -2416,21 +2536,38 @@ int main() {
              }
              else barrier4X--;
 
+             if (level > 3) {
+                 if (barrierup4 == 1) {
+                     if (barrier4Y > 17) {
+                         barrier4Y--;
+                     }
+                     else {
+                         barrierup4 = 0;
+                     }
+                 }
+                 else {
+                     if (barrier4Y + height4 - 5 < 122) {
+                         barrier4Y++;
+                     }
+                     else {
+                         barrierup4 = 1;
+                     }
+
+                 }
+             }
+
              drawFastVLine(barrier4X, barrier4Y, height4 , WHITE);
 
              //setTextColor(GREEN, BLACK);
              //setCursor(barrierX, barrierY);
              //Outstr('a');
 
-             if(x + 6 == barrier4X) {
+             if(x + 6 >= barrier4X && x <= barrier4X && powerUp < 1) {
                  if (y <= barrier4Y + height4 && y >= barrier4Y - 5) {
                      //delay(500);
                      level = -2;
                  }
              }
-
-
-
 
          //I2C*************************************************************
     }
