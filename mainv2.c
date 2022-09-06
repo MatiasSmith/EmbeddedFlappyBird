@@ -116,12 +116,6 @@ unsigned long UARTDataCount = 0;
 //                 GLOBAL VARIABLES -- End (Interrupts)
 
 
-//************************Accelerometer****************************************
-
-
-
-//**********************End Accelerometer****************************************
-
 //************************For Webservice Communication**************************
 
 #define MAX_URI_SIZE 128
