@@ -1424,12 +1424,15 @@ extern uVectorEntry __vector_table;
 // Globals used by the timer interrupt handler.
 //
 //*****************************************************************************
+
 static volatile unsigned long g_ulSysTickValue;
 static volatile unsigned long g_ulBase;
 static volatile unsigned long g_ulRefBase;
 static volatile unsigned long g_ulRefTimerInts = 0;
 static volatile unsigned long g_ulIntClearVector;
 unsigned long g_ulTimerInts;
+
+//Code Written by me (lines 1435 - 1501)
 
 /* Timer */
 unsigned long clock;
@@ -1537,6 +1540,8 @@ static void BoardInit(void);
 //*****************************************************************************
 //                      LOCAL FUNCTION DEFINITIONS
 //*****************************************************************************
+
+//Code written by me (lines 1544 - 1831)
 
 /*
  * Detects each Rising Edge of TV remote signal
@@ -1866,6 +1871,9 @@ BoardInit(void) {
 //! \return None.
 //
 //****************************************************************************
+
+//Code written by me (lines 1875 - 2525)
+
 int main() {
     unsigned long ulStatus;
 
